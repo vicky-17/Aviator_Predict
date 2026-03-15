@@ -3,9 +3,9 @@ node_modules/
 npm-debug.log*
 
 # Environment variables — NEVER commit these
-.env
+# .env
 .env.local
-.env.*
+# .env.*
 
 # Data files — too large for GitHub
 Data/
