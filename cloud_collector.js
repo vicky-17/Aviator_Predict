@@ -19,12 +19,21 @@
 
 const { chromium }  = require('playwright');
 const { MongoClient } = require('mongodb');
+const http = require('http');
+
+// ── HEALTH CHECK SERVER (required by Koyeb) ───────────────────
+// Koyeb checks port 8080 to know the app is alive
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end(`OK — ${totalSaved} rounds collected`);
+}).listen(8080, () => {
+  console.log('🌐  Health check server running on port 8080');
+});
 
 // ─── CONFIG ──────────────────────────────────────────────────
 const TARGET_URL   = 'https://india.melbet.com/en/games/crash';
-const MONGO_URI    = process.env.MONGO_URI || 'mongodb://localhost:27017/crash_db';
+const MONGO_URI    = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME      = 'crash_db';
-const SESSION_WAIT = 999 * 60 * 60 * 1000; // run forever (restart handles reconnect)
 const AUTO_RESTART = true;   // auto-reconnect if socket drops
 // ─────────────────────────────────────────────────────────────
 
@@ -362,7 +371,7 @@ setInterval(printStats, 30 * 60 * 1000);  // every 30 min
     ]
   });
 
-  const context = await browser.newContext();
+  const context = await browser.new_context ? browser.new_context() : browser.newContext();
   const page    = await context.newPage();
 
   function attachWS(p) {
@@ -393,7 +402,15 @@ setInterval(printStats, 30 * 60 * 1000);  // every 30 min
     console.error('Unhandled error:', err.message);
   });
 
-  await page.waitForTimeout(SESSION_WAIT);
+  // Keep alive forever using a heartbeat instead of waitForTimeout
+  // (waitForTimeout with huge values overflows 32-bit int)
+  await new Promise(() => {
+    setInterval(() => {
+      // heartbeat — keeps Node process alive forever
+    }, 60 * 1000);
+  });
+
+  // These lines are never reached but kept for clean shutdown signal
   await browser.close();
   await mongo.close();
 })();
