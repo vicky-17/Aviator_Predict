@@ -24,7 +24,7 @@ const { MongoClient } = require('mongodb');
 const TARGET_URL   = 'https://india.melbet.com/en/games/crash';
 const MONGO_URI    = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME      = 'crash_db';
-const SESSION_WAIT = 999 * 60 * 60 * 1000; // run forever (restart handles reconnect)
+const SESSION_WAIT = 2_147_483_647; // max 32-bit int (~24 days) // run forever (restart handles reconnect)
 const AUTO_RESTART = true;   // auto-reconnect if socket drops
 // ─────────────────────────────────────────────────────────────
 
