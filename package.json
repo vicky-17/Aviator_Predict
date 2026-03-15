@@ -1,0 +1,14 @@
+{
+  "name": "crash-cloud-collector",
+  "version": "1.0.0",
+  "description": "Melbet Crash data collector — runs headless, stores to MongoDB",
+  "main": "cloud_collector.js",
+  "scripts": {
+    "start": "node cloud_collector.js",
+    "collect": "node cloud_collector.js"
+  },
+  "dependencies": {
+    "playwright": "^1.42.0",
+    "mongodb": "^6.3.0"
+  }
+}
