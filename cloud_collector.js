@@ -298,36 +298,80 @@ setInterval(printStats, 30 * 60 * 1000);
 
   const browser = await chromium.launch({
     headless: true,
-    args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-blink-features=AutomationControlled', // hide automation
+      '--window-size=1280,720',
+    ],
   });
 
-  // Use browser.newPage() directly — most reliable across Playwright versions
-  const page = await browser.newPage();
+  // Create context with real browser fingerprint to avoid detection
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 720 },
+    locale: 'en-IN',
+    timezoneId: 'Asia/Kolkata',
+    // Remove webdriver property that sites use to detect headless
+    javaScriptEnabled: true,
+  });
 
-  // Attach WS listener BEFORE navigation so we don't miss the connection
-  page.on('websocket', ws => {
-    if (!ws.url().includes('sockets/crash')) return;
-    console.log(`🔌  WebSocket connected → ${ws.url()}\n${'─'.repeat(55)}`);
-    ws.on('framereceived', frame =>
-      String(frame.payload).split('\x1e').filter(Boolean).forEach(handleFrame)
-    );
-    ws.on('close', async () => {
-      console.log('⚠️  WebSocket closed — reloading in 10s...');
-      if (AUTO_RESTART) {
-        await new Promise(r => setTimeout(r, 10000));
-        try { await page.reload({ waitUntil: 'networkidle', timeout: 60000 }); }
-        catch(e) { console.log('Reload error:', e.message); }
-      }
+  // Hide automation flags
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-IN', 'en'] });
+  });
+
+  const page = await context.newPage();
+
+  // Listen for WebSocket on ALL pages including iframes
+  function attachWS(p) {
+    p.on('websocket', ws => {
+      if (!ws.url().includes('sockets/crash')) return;
+      console.log(`🔌  WebSocket connected → ${ws.url()}\n${'─'.repeat(55)}`);
+      ws.on('framereceived', frame =>
+        String(frame.payload).split('\x1e').filter(Boolean).forEach(handleFrame)
+      );
+      ws.on('close', async () => {
+        console.log('⚠️  WebSocket closed — reloading in 10s...');
+        if (AUTO_RESTART) {
+          await new Promise(r => setTimeout(r, 10000));
+          try { await page.reload({ waitUntil: 'networkidle', timeout: 60000 }); }
+          catch(e) { console.log('Reload error:', e.message); }
+        }
+      });
     });
+  }
+
+  // Attach to main page AND any new pages/iframes that open
+  attachWS(page);
+  context.on('page', newPage => {
+    console.log(`📄  New page/iframe: ${newPage.url()}`);
+    attachWS(newPage);
   });
 
-  // Navigate — networkidle ensures JS is fully executed and WS is established
-  console.log('🌐  Navigating to crash game (waiting for full load)...');
+  // Navigate and wait for game to fully load
+  console.log('🌐  Navigating to crash game...');
   try {
-    await page.goto(TARGET_URL, { waitUntil: 'networkidle', timeout: 90000 });
-    console.log('✅  Page loaded successfully');
+    await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log('✅  DOM loaded — waiting for game iframe...');
+
+    // Wait for the game iframe to appear (it loads the WebSocket)
+    try {
+      await page.waitForSelector('iframe', { timeout: 30000 });
+      console.log('✅  Game iframe found');
+    } catch(e) {
+      console.log('⚠️  No iframe found — trying anyway:', e.message);
+    }
+
+    // Extra wait for JS to execute and WS to connect
+    await new Promise(r => setTimeout(r, 8000));
+    console.log('✅  Wait complete — WebSocket should be connected');
   } catch(e) {
-    console.log('⚠️  Page load timeout — continuing anyway:', e.message);
+    console.log('⚠️  Navigation error:', e.message);
   }
 
   // Watchdog: if no rounds saved for 90s, the WS probably died — reload
