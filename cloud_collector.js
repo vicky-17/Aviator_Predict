@@ -21,19 +21,17 @@ const { chromium }  = require('playwright');
 const { MongoClient } = require('mongodb');
 const http = require('http');
 
-// ── HEALTH CHECK SERVER (required by Koyeb) ───────────────────
-// Koyeb checks port 8080 to know the app is alive
+// ── HEALTH CHECK SERVER (required by Koyeb) ──────────────────
 http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end(`OK — ${totalSaved} rounds collected`);
-}).listen(8080, () => {
-  console.log('🌐  Health check server running on port 8080');
-});
+  res.end('OK - rounds: ' + totalSaved);
+}).listen(8080, () => console.log('🌐  Health check server on port 8080'));
 
 // ─── CONFIG ──────────────────────────────────────────────────
 const TARGET_URL   = 'https://india.melbet.com/en/games/crash';
 const MONGO_URI    = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME      = 'crash_db';
+// Keep alive via infinite Promise — no timeout needed
 const AUTO_RESTART = true;   // auto-reconnect if socket drops
 // ─────────────────────────────────────────────────────────────
 
@@ -371,8 +369,7 @@ setInterval(printStats, 30 * 60 * 1000);  // every 30 min
     ]
   });
 
-  const context = await browser.new_context ? browser.new_context() : browser.newContext();
-  const page    = await context.newPage();
+  const page = await browser.newPage();
 
   function attachWS(p) {
     p.on('websocket', ws => {
@@ -392,7 +389,6 @@ setInterval(printStats, 30 * 60 * 1000);  // every 30 min
   }
 
   attachWS(page);
-  context.on('page', attachWS);
 
   await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
   console.log('⏳  Running headless — collecting forever...\n');
@@ -402,15 +398,10 @@ setInterval(printStats, 30 * 60 * 1000);  // every 30 min
     console.error('Unhandled error:', err.message);
   });
 
-  // Keep alive forever using a heartbeat instead of waitForTimeout
-  // (waitForTimeout with huge values overflows 32-bit int)
+  // Keep alive forever
   await new Promise(() => {
-    setInterval(() => {
-      // heartbeat — keeps Node process alive forever
-    }, 60 * 1000);
+    setInterval(() => {}, 60000); // heartbeat
   });
-
-  // These lines are never reached but kept for clean shutdown signal
   await browser.close();
   await mongo.close();
 })();
