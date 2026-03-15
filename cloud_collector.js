@@ -24,7 +24,7 @@ http.createServer((req, res) => {
 }).listen(8080, () => console.log('🌐  Health check server on port 8080'));
 
 // ─── CONFIG ──────────────────────────────────────────────────
-const TARGET_URL   = 'https://india.melbet.com/en/games/crash';
+const TARGET_URL   = 'https://melbet.com/en/games/crash';
 const MONGO_URI    = process.env.MONGO_URI || 'mongodb://localhost:27017/crash_db';
 const DB_NAME      = 'crash_db';
 const AUTO_RESTART = true;
@@ -330,7 +330,7 @@ setInterval(printStats, 30 * 60 * 1000);
   // Listen for WebSocket on ALL pages including iframes
   function attachWS(p) {
     p.on('websocket', ws => {
-      if (!ws.url().includes('sockets/crash')) return;
+      if (!ws.url().includes('crash')) return;  // match any crash game socket
       console.log(`🔌  WebSocket connected → ${ws.url()}\n${'─'.repeat(55)}`);
       ws.on('framereceived', frame =>
         String(frame.payload).split('\x1e').filter(Boolean).forEach(handleFrame)
