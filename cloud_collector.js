@@ -362,7 +362,7 @@ setInterval(printStats, 30 * 60 * 1000);  // every 30 min
     ]
   });
 
-  const context = await browser.new_context ? browser.new_context() : browser.newContext();
+  const context = await browser.newContext();
   const page    = await context.newPage();
 
   function attachWS(p) {

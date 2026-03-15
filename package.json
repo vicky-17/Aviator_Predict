@@ -4,7 +4,7 @@
   "main": "cloud_collector.js",
   "dependencies": {
     "mongodb": "^6.3.0",
-    "ws": "^8.16.0" 
+    "playwright": "^1.42.0"
   },
   "scripts": {
     "start": "node cloud_collector.js"
